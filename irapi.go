@@ -11,11 +11,19 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
+	"os"
 	"strings"
 )
 
 // UserAgent is the value given for the User-Agent
-const UserAgent = "Mozilla/5.0 (Windows NT 10.0; rv:78.0) Gecko/20100101 Firefox/78.0"
+//const UserAgent = "Mozilla/5.0 (Windows NT 10.0; rv:78.0) Gecko/20100101 Firefox/78.0"
+const UserAgent = "irapi/1.0 +https://github.com/LeoAdamek/irapi"
+
+// ErrLoginFailed is a generic error for when login fails due to credentials or system failure
+var ErrLoginFailed = errors.New("failed login")
+
+// ErrMaintenance is an error returned when iRacing is down for maintanenace
+var ErrMaintenance = errors.New("iRacing is offline for maintaneance")
 
 // IRacing is an instance of an API client for the iRacing Service
 type IRacing struct {
@@ -26,21 +34,34 @@ type IRacing struct {
 }
 
 // BeforeFunc is a function which runs before a request is sent
+//
+// These can be used with `IRacing.BeforeRequest()` to add middleware before a request is made.
+// BeforeFunc handlers are responsible for preserving the content of `req.Body` if they consume it.
 type BeforeFunc func(ctx context.Context, req *http.Request) error
 
 // AfterFunc is a function which is fun after a response is received
+//
+// These can be used with `IRacing.AfterResponse()` to add middleware after a response is received.
+// AfterFunc handlers are responsible for preserving the content of `res.Body` if they consume it.
 type AfterFunc func(ctx context.Context, req *http.Request, res *http.Response) error
 
 // Host is the address where the iRacing service is hosted
 const Host = "https://members.iracing.com"
 
-// New crates a new iRApi instance
-func New(ctx context.Context, credentials CredentialsProvider) *IRacing {
+// New crates a new iRacing API client instance
+func New(credentials CredentialsProvider) *IRacing {
 
-	jar, _ := cookiejar.New(nil)
+	jar, err := cookiejar.New(nil)
+
+	if err != nil {
+		panic(err)
+	}
 
 	client := &http.Client{
 		Jar: jar,
+		// CheckRedirect: func(req *http.Request, via []*http.Request) error {
+		// 	return http.ErrUseLastResponse
+		// },
 	}
 
 	return &IRacing{
@@ -69,6 +90,8 @@ func (c IRacing) do(ctx context.Context, req *http.Request) (*http.Response, err
 
 	req.Header.Set("User-Agent", UserAgent)
 	req.Header.Set("Cache-Control", "no-cache")
+	req.Header.Set("Origin", "members.iracing.com")
+	req.Header.Set("Referer", Host+"/membersite/login.jsp")
 
 	for _, f := range c.BeforeFuncs {
 		if err := f(ctx, req); err != nil {
@@ -88,6 +111,10 @@ func (c IRacing) do(ctx context.Context, req *http.Request) (*http.Response, err
 		err = errors.New("error server response")
 	}
 
+	if res.Header.Get("X-Maintenance-Mode") == "true" {
+		return res, ErrMaintenance
+	}
+
 	return res, err
 }
 
@@ -95,16 +122,22 @@ func (c *IRacing) json(ctx context.Context, method, path string, body, into inte
 	var reader io.Reader
 
 	if body != nil {
-		buffer := new(bytes.Buffer)
-		if err := json.NewEncoder(buffer).Encode(body); err != nil {
-			return err
-		}
+		switch b := body.(type) {
+		case io.Reader:
+			reader = b
+		default:
+			buffer := new(bytes.Buffer)
+			if err := json.NewEncoder(buffer).Encode(body); err != nil {
+				return err
+			}
 
-		reader = buffer
+			reader = buffer
+		}
 	}
 
 	req, _ := http.NewRequestWithContext(ctx, method, Host+path, reader)
 
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Accept", "application/json")
 
 	res, err := c.do(ctx, req)
@@ -114,7 +147,11 @@ func (c *IRacing) json(ctx context.Context, method, path string, body, into inte
 	}
 
 	if res.StatusCode >= 400 {
-		return errors.New("server returned an error")
+		if res.StatusCode >= 500 {
+			return errors.New("server returned an error")
+		}
+
+		return errors.New("server rejected our request")
 	}
 
 	content, err := ioutil.ReadAll(res.Body)
@@ -133,6 +170,8 @@ func (c *IRacing) json(ctx context.Context, method, path string, body, into inte
 }
 
 // Login will log into the iRacing Service
+//
+// NOTE: Middleware is not invoked for Login requests.
 func (c *IRacing) Login(ctx context.Context) error {
 
 	credentials, err := c.credentialsProvider()
@@ -141,19 +180,15 @@ func (c *IRacing) Login(ctx context.Context) error {
 		return err
 	}
 
-	params := make(url.Values)
+	params := url.Values{}
 	params.Set("username", credentials.Username)
 	params.Set("password", credentials.Password)
-	params.Set("AUTOLOGIN", "on")
 	params.Set("utcoffset", "0")
 	params.Set("todaysdate", "")
 
-	body := params.Encode()
-
-	req, _ := http.NewRequestWithContext(ctx, http.MethodPost, Host+"/membersite/Login", strings.NewReader(body))
+	req, _ := http.NewRequestWithContext(ctx, http.MethodPost, Host+"/membersite/Login", strings.NewReader(params.Encode()))
 
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	req.Header.Set("Referer", Host+"/membersite/login.jsp")
 
 	res, err := c.do(ctx, req)
 
@@ -161,9 +196,23 @@ func (c *IRacing) Login(ctx context.Context) error {
 		return err
 	}
 
-	if res.StatusCode != http.StatusOK {
-		return fmt.Errorf("expected to get an OK response to login, instead got %s", res.Status)
+	if res.StatusCode == http.StatusOK {
+		return nil
+	} else if res.StatusCode == http.StatusFound {
+		redirect := res.Header.Get("Location")
+
+		if redirect == "https://members.iracing.com/membersite/failedlogin.jsp" {
+
+			io.Copy(os.Stderr, res.Body)
+
+			return ErrLoginFailed
+		}
+		return nil
 	}
 
-	return nil
+	if res.Header.Get("X-Maintenance-Mode") == "true" {
+		return ErrMaintenance
+	}
+
+	return fmt.Errorf("expected to get an OK response to login, instead got %s", res.Status)
 }

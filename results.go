@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -33,6 +34,8 @@ const (
 
 	SortDirASC SortDir = iota
 	SortDirDESC
+
+	SessionPhaseRace = iota
 )
 
 var resultSortFieldStrings = []string{
@@ -129,6 +132,19 @@ type SessionResult struct {
 	Results []DriverResult `json:"rows"`
 }
 
+type getLapTimesResponse struct {
+	Laptimes []LapResult `json:"lapData"`
+}
+
+type LapFlags uint64
+
+type LapResult struct {
+	SessionTime uint64   `json:"ses_time"`
+	UserID      uint64   `json:"custid"`
+	Flags       LapFlags `json:"flags"`
+	LapNumber   uint64   `json:"lap_num"`
+}
+
 // DriverResult shows the results for a single driver
 type DriverResult struct {
 	Name           string `json:"displayname"`
@@ -165,6 +181,7 @@ type SearchResultsOptions struct {
 	Season *SeasonFilter
 
 	DateRange *DateRange
+	UserID    uint64
 
 	SortBy  SortField
 	SortDir SortDir
@@ -254,7 +271,7 @@ type SearchResultData struct {
 	LicenceGroup           LicenceClass    `json:"35"`
 	WinnerHelmetPattern    int             `json:"36"`
 	EventType              int             `json:"37"`
-	BestLapTime            float64         `json:"38,string"`
+	BestLapTime            string          `json:"38"`
 	Incidents              int             `json:"39"`
 	ChapionshipPoints      int             `json:"40"`
 	SubsessionID           uint64          `json:"41"`
@@ -283,7 +300,7 @@ func (c *IRacing) GetSubSessionResult(ctx context.Context, subsessionID uint64) 
 // SearchResults searches for results based on the ID of a given participent user and other options
 //
 // @param userID ID of a user who participated in the session
-func (c *IRacing) SearchResults(ctx context.Context, userID uint64, opts *SearchResultsOptions) ([]SearchResultData, error) {
+func (c *IRacing) SearchResults(ctx context.Context, opts *SearchResultsOptions) ([]SearchResultData, error) {
 
 	if opts.DateRange != nil && opts.Season != nil {
 		return nil, errors.New("only one of Season or DateRange may be specified")
@@ -294,7 +311,9 @@ func (c *IRacing) SearchResults(ctx context.Context, userID uint64, opts *Search
 	path := "/memberstats/member/GetResults"
 	params := make(url.Values)
 
-	params.Set("custid", strconv.FormatUint(userID, 10))
+	if opts.UserID > 0 {
+		params.Set("custid", strconv.FormatUint(opts.UserID, 10))
+	}
 
 	if d := opts.DateRange; d != nil {
 		params.Set("starttime_low", strconv.FormatInt(d.Lower.Unix()*1000, 10))
@@ -327,7 +346,7 @@ func (c *IRacing) SearchResults(ctx context.Context, userID uint64, opts *Search
 	params.Set("showpro", fm(opts.IncludePro))
 	params.Set("showprowc", fm(opts.IncludeProWC))
 
-	params.Set("category", "1,2,3,4")
+	params.Set("category[]", "1,2,3,4")
 	params.Set("format", "json")
 	params.Set("sort", opts.SortBy.String())
 	params.Set("order", opts.SortDir.String())
@@ -341,4 +360,23 @@ func (c *IRacing) SearchResults(ctx context.Context, userID uint64, opts *Search
 	}
 
 	return resp.Data.Rows, nil
+}
+
+func (c *IRacing) GetLaps(ctx context.Context, sessionID uint64, entrantID uint64, phase uint64) ([]LapResult, error) {
+	path := "/membersite/member/GetLaps"
+
+	params := make(url.Values)
+	params.Set("subsessionid", strconv.FormatUint(sessionID, 10))
+	params.Set("groupid", strconv.FormatUint(entrantID, 10))
+	params.Set("simsesnum", strconv.FormatUint(phase, 10))
+
+	path += "?=&" + params.Encode()
+
+	resp := &getLapTimesResponse{}
+
+	if err := c.json(ctx, http.MethodPost, path, strings.NewReader("a=null"), resp); err != nil {
+		return nil, err
+	}
+
+	return resp.Laptimes, nil
 }

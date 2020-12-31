@@ -14,6 +14,9 @@ type Credentials struct {
 }
 
 // CredentialsProvider is a function which attempts to return a set of Credentials
+// This allows credentials to be seamlessly provided by any source, with providers for
+// static credentials, text-file credntials and environment variable credentials included.
+// Other providers can be easily created for sources like Vault, AWS Secrets etc.
 type CredentialsProvider func() (*Credentials, error)
 
 // StaticCredentialsProvider creates a new credential provider returning the given credentials
@@ -31,7 +34,6 @@ func StaticCredentialsProvider(username, password string) CredentialsProvider {
 //
 // File Format:	`{{.Username}},{{.Password}}`
 //
-//
 func FileCredentialsProvider(path string) CredentialsProvider {
 	return func() (*Credentials, error) {
 		data, err := ioutil.ReadFile(path)
@@ -40,7 +42,7 @@ func FileCredentialsProvider(path string) CredentialsProvider {
 			return nil, err
 		}
 
-		parts := strings.SplitN(string(data), ",", 1)
+		parts := strings.SplitN(string(data), ",", 2)
 
 		return &Credentials{
 			Username: parts[0],
