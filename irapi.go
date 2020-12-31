@@ -19,11 +19,17 @@ import (
 //const UserAgent = "Mozilla/5.0 (Windows NT 10.0; rv:78.0) Gecko/20100101 Firefox/78.0"
 const UserAgent = "irapi/1.0 +https://github.com/LeoAdamek/irapi"
 
-// ErrLoginFailed is a generic error for when login fails due to credentials or system failure
-var ErrLoginFailed = errors.New("failed login")
+var (
 
-// ErrMaintenance is an error returned when iRacing is down for maintanenace
-var ErrMaintenance = errors.New("iRacing is offline for maintaneance")
+	// ErrLoginFailed is a generic error for when login fails due to credentials or system failure
+	ErrLoginFailed = errors.New("failed login")
+
+	// ErrMaintenance is an error returned when iRacing is down for maintanenace
+	ErrMaintenance = errors.New("iRacing is offline for maintaneance")
+
+	// ErrTooManyRequests is an error returned when iRacing rejects requests due to volume
+	ErrTooManyRequests = errors.New("too many requests")
+)
 
 // IRacing is an instance of an API client for the iRacing Service
 type IRacing struct {
@@ -108,7 +114,13 @@ func (c IRacing) do(ctx context.Context, req *http.Request) (*http.Response, err
 	}
 
 	if res.StatusCode >= 400 {
-		err = errors.New("error server response")
+		if res.StatusCode == http.StatusTooManyRequests {
+			return res, ErrTooManyRequests
+		}
+
+		if res.StatusCode >= 500 {
+			err = errors.New("error server response")
+		}
 	}
 
 	if res.Header.Get("X-Maintenance-Mode") == "true" {
