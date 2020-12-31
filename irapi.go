@@ -209,6 +209,18 @@ func (c *IRacing) Login(ctx context.Context) error {
 	}
 
 	if res.StatusCode == http.StatusOK {
+
+		defer res.Body.Close()
+		content, err := ioutil.ReadAll(res.Body)
+
+		if err != nil {
+			return err
+		}
+
+		if strings.Contains(string(content), "Invalid email address/password or failed reCaptcha. Please try again.") {
+			return ErrLoginFailed
+		}
+
 		return nil
 	} else if res.StatusCode == http.StatusFound {
 		redirect := res.Header.Get("Location")
