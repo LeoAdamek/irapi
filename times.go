@@ -35,7 +35,7 @@ func (t Timestamp) MarshalJSON() ([]byte, error) {
 // SimTime represents a time as a string
 type SimTime time.Time
 
-const simTimeFormat = "2006-01-02 15:04"
+const simTimeFormat = "2006-01-02 15:04:05"
 
 func (s *SimTime) UnmarshalJSON(b []byte) error {
 
