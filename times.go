@@ -46,14 +46,14 @@ func (s *SimTime) UnmarshalJSON(b []byte) error {
 		return err
 	}
 
+	if len(str) == len(simTimeFormatLoose) {
+		str += ":00"
+	}
+
 	t, err := time.ParseInLocation(simTimeFormat, str, time.UTC)
 
 	if err != nil {
-		t, err = time.ParseInLocation(simTimeFormatLoose, str, time.UTC)
-
-		if err != nil {
-			return err
-		}
+		return err
 	}
 
 	*s = SimTime(t)
