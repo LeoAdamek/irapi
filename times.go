@@ -36,6 +36,7 @@ func (t Timestamp) MarshalJSON() ([]byte, error) {
 type SimTime time.Time
 
 const simTimeFormat = "2006-01-02 15:04:05"
+const simTimeFormatLoose = "2006-01-02 15:04:05"
 
 func (s *SimTime) UnmarshalJSON(b []byte) error {
 
@@ -48,7 +49,11 @@ func (s *SimTime) UnmarshalJSON(b []byte) error {
 	t, err := time.ParseInLocation(simTimeFormat, str, time.UTC)
 
 	if err != nil {
-		return err
+		t, err = time.ParseInLocation(simTimeFormatLoose, str, time.UTC)
+
+		if err != nil {
+			return err
+		}
 	}
 
 	*s = SimTime(t)
