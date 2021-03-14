@@ -68,7 +68,7 @@ func (m *Milliseconds) UnmarhsalJSON(b []byte) error {
 		return err
 	}
 
-	*m = Milliseconds(time.Duration(ms * 1000))
+	*m = Milliseconds(time.Duration(ms) * time.Millisecond)
 
 	return nil
 }
