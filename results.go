@@ -113,7 +113,7 @@ type SessionResult struct {
 	SimSessionType          int8            `json:"simsestype"`
 	SimulatedStartTime      SimTime         `json:"simulatedstarttime"`
 	SpecialEventType        int8            `json:"specialeventtype"`
-	StartTime               SimTime         `json:"starttime"`
+	StartTime               SimTime         `json:"start_time"`
 	TimeOfDay               int8            `json:"timeofday"`
 	TrackConfigName         string          `json:"track_config_name"`
 	TrackID                 uint64          `json:"trackid"`
