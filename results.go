@@ -129,7 +129,7 @@ type SessionResult struct {
 	WeatherWindspeedUnits   int8            `json:"weather_wind_speed_units"`
 	WeatherWindspeedValue   float64         `json:"weather_wind_speed_value"`
 
-	Results []DriverResult `json:"rows"`
+	Results []CarResult `json:"rows"`
 }
 
 type getLapTimesResponse struct {
@@ -145,14 +145,14 @@ type LapResult struct {
 	LapNumber   uint64   `json:"lap_num"`
 }
 
-// DriverResult shows the results for a single driver
-type DriverResult struct {
+// CarResult shows the results for a single driver
+type CarResult struct {
 	Name           string `json:"displayname"`
 	CarNumber      string `json:"carnum"`
 	StartPosition  int    `json:"startpos"`
 	FinishPosition int    `json:"finishpos"`
 
-	BestNLapNumber int     `json:"bestlapnum"`
+	BestNLapNumber int     `json:"bestnlapnum"`
 	NewCPI         float64 `json:"newcpi"`
 	SessionName    string  `json:"simsesname"`
 	CarClassName   string  `json:"ccName"`
@@ -160,6 +160,14 @@ type DriverResult struct {
 	NewIRating     int     `json:"newirating"`
 	CarID          uint    `json:"carid"`
 	LapsCompleted  uint    `json:"lapscomplete"`
+
+	UserID         int          `json:"custid"`
+	Division       int          `json:"division"`
+	AverageLapTime Milliseconds `json:"avglap"`
+	BestLapTime    Milliseconds `json:"bestlaptime"`
+	BestLapNumber  int          `json:"bestlapnum"`
+	Incidents      int          `json:"incidents"`
+	OutReason      string       `json:"reasonout"`
 }
 
 // SearchResultsOptions represents various options which can be given when searching results
