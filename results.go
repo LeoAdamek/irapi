@@ -88,7 +88,7 @@ type SessionResult struct {
 	EventType               int8            `json:"evttype"`
 	LapsComplete            uint            `json:"eventlapscompleted"`
 	LapsForSoloAverage      uint            `json:"nlapsforsoloavg"`
-	LeadChanges             uint            `json:"nleadchanges"`
+	LeadChanges             int             `json:"nleadchanges"`
 	LeaveMarbles            uint8           `json:"leavemarbles"`
 	MaxWeeks                uint8           `json:"maxweeks"`
 	MaximumTeamDrivers      uint8           `json:"max_team_drivers"`
