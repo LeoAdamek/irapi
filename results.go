@@ -101,7 +101,7 @@ type SessionResult struct {
 	RubberLevelQualify      int8            `json:"rubberlevel_qualify"`
 	RubberLevelRace         int8            `json:"rubberlevel_race"`
 	RubberLevelWarmup       int8            `json:"rubberlevel_warmup"`
-	SOF                     uint            `json:"eventstrengthoffield"`
+	SOF                     int16           `json:"eventstrengthoffield"`
 	SeasionShortname        string          `json:"seasion_shortname"`
 	SeasonID                int64           `json:"seasonID"`
 	SeasonName              string          `json:"season_name"`
