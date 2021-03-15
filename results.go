@@ -139,10 +139,11 @@ type getLapTimesResponse struct {
 type LapFlags uint64
 
 type LapResult struct {
-	SessionTime uint64   `json:"ses_time"`
-	UserID      uint64   `json:"custid"`
-	Flags       LapFlags `json:"flags"`
-	LapNumber   uint64   `json:"lap_num"`
+	SessionTime uint64        `json:"ses_time"`
+	UserID      uint64        `json:"custid"`
+	Flags       LapFlags      `json:"flags"`
+	LapNumber   uint64        `json:"lap_num"`
+	LapTime     time.Duration `json:"-"`
 }
 
 // CarResult shows the results for a single driver
@@ -370,12 +371,12 @@ func (c *IRacing) SearchResults(ctx context.Context, opts *SearchResultsOptions)
 	return resp.Data.Rows, nil
 }
 
-func (c *IRacing) GetLaps(ctx context.Context, sessionID uint64, entrantID uint64, phase int64) ([]LapResult, error) {
+func (c *IRacing) GetLaps(ctx context.Context, sessionID uint64, entrantID int64, phase int64) ([]LapResult, error) {
 	path := "/membersite/member/GetLaps"
 
 	params := make(url.Values)
 	params.Set("subsessionid", strconv.FormatUint(sessionID, 10))
-	params.Set("groupid", strconv.FormatUint(entrantID, 10))
+	params.Set("groupid", strconv.FormatInt(entrantID, 10))
 	params.Set("simsesnum", strconv.FormatInt(phase, 10))
 
 	path += "?=&" + params.Encode()
@@ -386,5 +387,16 @@ func (c *IRacing) GetLaps(ctx context.Context, sessionID uint64, entrantID uint6
 		return nil, err
 	}
 
-	return resp.Laptimes, nil
+	laps := resp.Laptimes
+
+	for i, l := range laps {
+		if i == 0 {
+			laps[i].LapTime = time.Duration(l.SessionTime * 100 * uint64(time.Microsecond))
+		} else {
+			delta := l.SessionTime - laps[i-1].SessionTime
+			laps[i].LapTime = time.Duration(delta * 100 * uint64(time.Microsecond))
+		}
+	}
+
+	return laps, nil
 }
