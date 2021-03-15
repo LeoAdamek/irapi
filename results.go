@@ -370,13 +370,13 @@ func (c *IRacing) SearchResults(ctx context.Context, opts *SearchResultsOptions)
 	return resp.Data.Rows, nil
 }
 
-func (c *IRacing) GetLaps(ctx context.Context, sessionID uint64, entrantID uint64, phase uint64) ([]LapResult, error) {
+func (c *IRacing) GetLaps(ctx context.Context, sessionID uint64, entrantID uint64, phase int64) ([]LapResult, error) {
 	path := "/membersite/member/GetLaps"
 
 	params := make(url.Values)
 	params.Set("subsessionid", strconv.FormatUint(sessionID, 10))
 	params.Set("groupid", strconv.FormatUint(entrantID, 10))
-	params.Set("simsesnum", strconv.FormatUint(phase, 10))
+	params.Set("simsesnum", strconv.FormatInt(phase, 10))
 
 	path += "?=&" + params.Encode()
 
